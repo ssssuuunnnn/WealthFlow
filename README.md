@@ -1,32 +1,306 @@
-# React + TypeScript + Vite
+# 💰 WealthFlow 家庭財務羅盤
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+> 將傳統生硬的 Excel 收支與資產負債表，轉化為具備「資金流向桑基圖」、「資產負債雙邊圖」與「動態輸入摺疊面板」的直覺式 Web 服務。
 
-Currently, two official plugins are available:
+🔗 **線上 Demo**：[https://ssssuuunnnn.github.io/WealthFlow/](https://ssssuuunnnn.github.io/WealthFlow/)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 🚀 快速開始
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+git clone https://github.com/ssssuuunnnn/WealthFlow.git
+cd WealthFlow
+npm install
+npm run dev
+```
 
-## Expanding the Oxlint configuration
+開發伺服器啟動後開啟 [http://localhost:5173/WealthFlow/](http://localhost:5173/WealthFlow/)
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+| 指令 | 說明 |
+|---|---|
+| `npm run dev` | 啟動開發伺服器 (HMR) |
+| `npm run build` | 建置生產版本至 `dist/` |
+| `npm run lint` | 執行 Oxlint 程式碼檢查 |
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
+---
+
+## 產品需求文件 (PRD) — WealthFlow 家庭財務羅盤
+
+### 1. 專案概述 (Project Overview)
+
+- **專案名稱**：WealthFlow 家庭財務羅盤
+- **專案類型**：純前端個人/家庭財務管理系統 (SPA)
+- **部署環境**：GitHub Pages
+- **目標**：將傳統生硬的 Excel 收支與資產負債表，轉化為具備「資金流向桑基圖」、「資產負債雙邊圖」與「動態輸入摺疊面板」的直覺式 Web 服務。支援雙薪家庭（本人/配偶/家庭合計）的多維度財務檢視。
+
+---
+
+### 2. 技術棧與架構限制 (Technical Stack & Constraints)
+
+**核心架構**：單頁應用程式 (SPA)，不依賴任何後端 API 或伺服器資料庫。
+
+**技術棧**：
+
+| 面向 | 選用技術 |
+|---|---|
+| 框架 | React (Vite) + TypeScript |
+| 樣式 | Tailwind CSS（響應式 + 深色/淺色主題） |
+| 圖表 | Recharts + D3-Sankey（Sankey Diagram, Bar, Line） |
+| 狀態管理 | React Context API |
+| 本地儲存 | localStorage |
+| 備份移轉 | 一鍵匯出 JSON/CSV；導入 JSON 還原 |
+
+---
+
+### 3. 資料模型設計 (Data Schema)
+
+```typescript
+// 定義成員維度
+export type FinanceMember = '本人' | '配偶' | '家庭合計';
+
+// 定義時間週期頻率
+export type TimeFrequency = '月' | '季' | '年';
+
+// 1. 現金收入記錄
+export interface IncomeEntry {
+  id: string;
+  date: string; // YYYY-MM
+  member: FinanceMember;
+  category: '工作收入' | '理財收入';
+  subcategory: string; // 薪資, 獎金(三節/年終), 加班費, 兼職收入, 營業分紅, 利息, 投資收入(股利/基金), 租金
+  frequency: TimeFrequency;
+  amount: number;
+  note?: string;
+}
+
+// 2. 現金支出記錄
+export interface ExpenseEntry {
+  id: string;
+  date: string; // YYYY-MM
+  member: FinanceMember;
+  category: '生活費' | '貸款' | '撫育費用' | '保險費' | '理財支出' | '稅賦' | '雜費';
+  subcategory: string; // 食, 衣, 住, 行, 醫, 房屋貸款, 房租, 父母撫養, 子女學雜, 商業保險, 定期定額, 所得稅, 旅遊等
+  frequency: TimeFrequency;
+  amount: number;
+  note?: string;
+}
+
+// 3. 資產負債靜態快照 (每月底點記)
+export interface BalanceSheetSnapshot {
+  date: string; // YYYY-MM
+  member: FinanceMember;
+  assets: {
+    liquidAssets: { // 生息資產
+      cashAndDeposit: number; // 現金/活存/支存
+      foreignDeposit: number; // 外幣存款/貨幣基金
+      taiwanDeposit: number;  // 台幣定存
+      stocks: number;         // 股票市值
+      bonds: number;          // 債券
+      fundsAndEtf: number;    // 共同基金/ETF
+      others: number;         // 期貨/儲蓄險價值/事業股權/另類資產
+    };
+    selfUsedAssets: { // 自用資產
+      realEstate: number;     // 自用房屋土地估值
+      car: number;            // 自用汽車
+    };
+  };
+  liabilities: {
+    shortTerm: { // 消費性/民間負債
+      creditCardAndShortTerm: number; // 信用卡未繳/民間借貸
+    };
+    longTerm: { // 長期/擔保負債
+      houseLoan: number;      // 自用房屋貸款
+      otherLoan: number;      // 信貸/車貸/保單貸款
+    };
+  };
 }
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+---
+
+### 4. 核心功能與頁面佈局需求 (Functional Requirements)
+
+#### 全域佈局 (Global Layout)
+
+- **左側導覽欄 (Sidebar)**：深色背景（Slate-900）。包含 Logo WealthFlow 及四大選單按鈕：主儀表板、數據輸入、歷史查詢、系統設定。
+- **頂部工具欄 (Top Navbar)**：顯示當前頁面名稱、未讀通知圖示、以及使用者頭像。
+
+---
+
+#### 功能頁面 1：主儀表板 (Dashboard Page)
+
+```
++----------------------------------------------------------------------------------+
+| [KPI 卡片 1]        [KPI 卡片 2]         [KPI 卡片 3]      [KPI 卡片 4]          |
+|  當月淨現金流        家庭儲蓄理財率         家庭淨資產         整體負債比率            |
+|  $59,382 (+5%)      34.8% (優良)         $9,336,227        38.1% (安全)          |
++----------------------------------------------------------------------------------+
+| [圖表 A：家庭資金流向桑基圖 (Sankey)]   | [圖表 B：資產負債對比 (Dual Bar)]        |
+|                                         |                                        |
+|  工作收入 ──+                           | [資產] $1,508萬 vs [負債] $574萬        |
+|             |──> [總收入] ──> 房貸      |  +----------+  +----------+            |
+|  理財收入 ──+          ├──> 生活費      |  | 房產 66% |  |          |            |
+|                        └──> 理財蓄      |  | 股票 24% |  | 房貸100% |            |
+|                                         |  | 現金 10% |  |          |            |
++----------------------------------------------------------------------------------+
+| [圖表 C：收支歷史趨勢折線圖 (Line Chart)]                                          |
+|  (橫軸：月份 1-12月；縱軸：金額)  ── 總收入折線  ── 總支出折線                      |
++----------------------------------------------------------------------------------+
+| [💡 財務備忘與動態提示 (Notes & Alerts)]                                          |
+|  • 本人備註：台積電部位以資本利得為主，未全額計入股利收入。                           |
+|  • 配偶備註：已配置緊急預備金共 50 萬元（30萬/20萬拆分），抗風險能力無虞。           |
++----------------------------------------------------------------------------------+
+```
+
+**核心 KPI 卡片 (Grid × 4)**：
+
+| KPI | 公式 | 色燈 |
+|---|---|---|
+| 當月淨現金流 | 總收入 − 總支出 | ≥0 綠色 / <0 紅色 |
+| 家庭儲蓄理財率 | (理財支出 + 超額儲蓄) / 總收入 × 100% | ≥30% 優良 |
+| 家庭淨資產 | 總資產 − 總負債 | — |
+| 整體負債比率 | 總負債 / 總資產 × 100% | 0–50% 綠燈 / >50% 黃/紅燈 |
+
+**視覺化圖表**：
+
+- **圖表 A — Sankey**：收入來源（工作/理財）→ 總收入 → 支出分類（生活費/貸款/撫育/保險/理財/稅雜/超額儲蓄）
+- **圖表 B — Dual Bar**：左柱總資產（生息+自用堆疊）、右柱總負債（短期+長期堆疊）
+- **圖表 C — Line Chart**：全年雙折線（總收入綠線 / 總支出紅線）
+
+---
+
+#### 功能頁面 2：數據輸入中心 (Data Entry Hub)
+
+```
++----------------------------------------------------------------------------------+
+|  [ Tab: 現金流輸入 ]  |  [ Tab: 資產負債快照 ]                                   |
++----------------------------------------------------------------------------------+
+| 【左欄：現金收入表】                 | 【右欄：現金支出表】                         |
+|  ▼ 工作收入 [小計]                  |  ▶ 生活費 (食、衣、住、行、醫...)            |
+|    薪資:     [ 66,490 ] /月         |  ▼ 貸款費用 [小計]                          |
+|    獎金:     [ 132,980 ] /年        |    房屋貸款: [ 12,000 ] /月                 |
+|    加班費:   [ 0 ] /月              |    房租:     [ 0 ] /月                      |
+|  ▼ 理財收入 [小計]                  |  ▶ 撫育費用 (父母撫養、子女學雜...)          |
+|    利息收入: [ 3,209 ] /年          |  ▶ 保險費 (健保、商業保險...)               |
+|    投資收入: [ 55,297 ] /年         |  ▶ 理財支出 (定期定額、股票認股...)          |
+|    租金收入: [ 0 ] /月              |  ▶ 稅賦與雜費 (所得稅、旅遊交際...)         |
++----------------------------------------------------------------------------------+
+|  備註說明：[ 投資部位70%大盤、30%主動選股... ]                          [儲存]    |
++----------------------------------------------------------------------------------+
+```
+
+**Tab A — 現金流輸入**：
+- 頂部控制：年/月選擇 + 成員切換（本人 / 配偶 / 家庭合計）
+- 左右雙欄：收入（左）/ 支出（右），手風琴 Accordion 展開細項
+- 每個細項輸入框右側附帶週期下拉選單（月 / 季 / 年）
+- 底端全寬備註 Textarea + 儲存按鈕
+
+**Tab B — 資產負債快照**：
+- 左欄：資產（生息資產、自用資產）
+- 右欄：負債（消費性、長期擔保）
+- **「同上月數據」按鈕**：自動讀取 localStorage 上月資料填入
+
+---
+
+#### 功能頁面 3：歷史紀錄查詢 (History Ledger Page)
+
+```
++----------------------------------------------------------------------------------+
+|  篩選：[ 開始月份 ~ 結束月份 ]  成員：[ 全部 ]  類型：[ 收入 ▼ ]  [🔍 查詢] [📥 匯出] |
++----------------------------------------------------------------------------------+
+|  切換檢視： (●) 經典表格模式  ( ) 時間軸動態模式                                    |
+|                                                                                  |
+|  時間項目  | 成員     | 項目大類  | 項目細項  | 金額(月)   | 金額(年)              |
+|  2025/12   | 本人     | 工作收入  | 薪資      | $66,490    | $797,880             |
+|  2025/12   | 本人     | 工作收入  | 獎金      | --         | $132,980             |
+|  2025/12   | 配偶     | 理財收入  | 租金收入  | $3,000     | $36,000              |
+|  2025/12   | 家庭合計 | 貸款支出  | 房屋貸款  | $23,697    | $284,364             |
+|                                                                                  |
+|  ◄ [1] 2 3 4 5 ►   顯示 1-10 筆，共 142 筆資料                                   |
++----------------------------------------------------------------------------------+
+```
+
+- **進階篩選**：時間區間、成員、報表類型（收入/支出/全部）
+- **經典表格模式**：標準 Grid，含灰色唯讀合計列，右側刪除操作
+- **時間軸模式**：月份卡片流，點擊展開當月細項明細
+- **匯出 CSV**：前端 Blob 下載
+
+---
+
+#### 功能頁面 4：系統設定 (Settings Page)
+
+- 資料統計概覽（收入/支出/快照/備忘筆數）
+- **匯出 JSON**：一鍵備份所有資料
+- **匯入 JSON**：從備份還原（覆蓋現有資料）
+- **清除資料**：重置 localStorage（不可復原）
+
+---
+
+### 5. 核心運算與商務邏輯 (Core Logic & Calculations)
+
+#### 頻率權重計算
+
+| 輸入頻率 | 月金額換算 | 年金額換算 |
+|---|---|---|
+| 月 | 原始值 | × 12 |
+| 季 | ÷ 3 | × 4 |
+| 年 | ÷ 12 | 原始值 |
+
+#### 公式防錯機制
+
+所有數值欄位計算前必須通過 `Number()` 轉換，空值或非法字串一律歸零：
+
+```typescript
+export const safeNum = (v: unknown): number => Number(v) || 0;
+```
+
+#### 資產負債聯動
+
+當使用者輸入「房屋貸款支出」本金扣除額時，系統應提示或自動在長期負債「房屋貸款餘額」中扣除對應金額。
+
+---
+
+### 6. UI/UX 視覺規範 (Design System Guidelines)
+
+**字體**：Inter, Noto Sans TC（系統字型）
+
+**Tailwind 色彩規範**：
+
+| 用途 | Class |
+|---|---|
+| 主要內容背景 | `bg-gray-50` |
+| 導覽列背景 | `bg-slate-900` |
+| 收入 / 正資產 | `text-emerald-600` / `bg-emerald-50` |
+| 支出 / 負債 | `text-rose-600` / `bg-rose-50` |
+| 理財儲蓄 / 投資 | `text-blue-600` / `bg-blue-50` |
+
+**互動動畫**：所有按鈕、手風琴展開均套用 `transition-all duration-200 ease-in-out`
+
+---
+
+## 專案結構
+
+```
+src/
+├── components/
+│   ├── dashboard/
+│   │   ├── KpiCard.tsx       # KPI 卡片元件
+│   │   └── SankeyChart.tsx   # D3-Sankey 資金流向圖
+│   └── layout/
+│       ├── Sidebar.tsx       # 左側導覽欄
+│       └── TopNavbar.tsx     # 頂部工具欄
+├── context/
+│   └── AppContext.tsx        # 全域狀態管理 (React Context)
+├── pages/
+│   ├── DashboardPage.tsx     # 主儀表板
+│   ├── DataEntryPage.tsx     # 數據輸入中心
+│   ├── HistoryPage.tsx       # 歷史紀錄查詢
+│   └── SettingsPage.tsx      # 系統設定
+├── types/
+│   └── index.ts              # TypeScript 介面定義
+├── utils/
+│   ├── finance.ts            # 財務計算工具函式
+│   └── storage.ts            # localStorage 讀寫 + JSON 匯出入
+└── App.tsx
+```
